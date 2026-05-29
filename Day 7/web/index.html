@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Smart Railway Crowd Prediction</title>
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+    <header class="navbar">
+        <div class="brand">
+            <div class="logo">SR</div>
+            <div>
+                <div class="title">Smart Railway Crowd Prediction</div>
+                <div class="subtitle">Passenger crowd level model</div>
+            </div>
+        </div>
+        <div id="modelStatus" class="model-status">Model loading</div>
+    </header>
+
+    <main class="page">
+        <section class="panel input-panel">
+            <div class="panel-header">
+                <h1>Passenger Details</h1>
+                <span class="tag">Text Dataset</span>
+            </div>
+
+            <form id="predictForm" class="prediction-form">
+                <div class="route-box">
+                    <label>
+                        <span>Source City / Station</span>
+                        <input
+                            type="text"
+                            id="source"
+                            list="sourceOptions"
+                            placeholder="Search source"
+                            autocomplete="off"
+                            required
+                        />
+                        <datalist id="sourceOptions"></datalist>
+                    </label>
+
+                    <button type="button" id="swapRouteBtn" class="swap-btn" title="Swap source and destination">
+                        Swap
+                    </button>
+
+                    <label>
+                        <span>Destination City / Station</span>
+                        <input
+                            type="text"
+                            id="destination"
+                            list="destinationOptions"
+                            placeholder="Search destination"
+                            autocomplete="off"
+                            required
+                        />
+                        <datalist id="destinationOptions"></datalist>
+                    </label>
+                </div>
+
+                <div class="form-grid">
+                <label>
+                    <span>Age</span>
+                    <input type="number" id="age" min="1" max="120" value="25" required />
+                </label>
+
+                <label>
+                    <span>Gender</span>
+                    <select id="gender" required></select>
+                </label>
+
+                <label>
+                    <span>Booking Type</span>
+                    <select id="bookingType" required></select>
+                </label>
+
+                <label>
+                    <span>Fare</span>
+                    <input type="number" id="fare" min="1" step="1" value="1000" required />
+                    <small id="fareHint">Low <= 971, Medium 972-1719, High >= 1720</small>
+                </label>
+
+                <label>
+                    <span>Ticket Status</span>
+                    <select id="ticketStatus" required></select>
+                </label>
+
+                <button type="submit" id="predictBtn" class="btn">Predict Crowd</button>
+                </div>
+            </form>
+        </section>
+
+        <aside class="panel result-panel">
+            <div class="panel-header">
+                <h2>Prediction</h2>
+                <span id="resultBadge" class="tag neutral">Ready</span>
+            </div>
+
+            <div id="result" class="result-text">--</div>
+            <div id="routeSummary" class="route-summary">Select a route to predict crowd level.</div>
+            <div id="error" class="error-text"></div>
+
+            <div class="probability-wrap">
+                <h3>Confidence</h3>
+                <div id="probabilities" class="probabilities"></div>
+            </div>
+        </aside>
+
+        <section class="panel dashboard-panel">
+            <div class="stat">
+                <span>Dataset Rows</span>
+                <strong id="datasetRows">--</strong>
+            </div>
+            <div class="stat">
+                <span>Model Accuracy</span>
+                <strong id="modelAccuracy">--</strong>
+            </div>
+            <div class="stat">
+                <span>Last Prediction</span>
+                <strong id="lastPrediction">--</strong>
+            </div>
+        </section>
+
+        <section class="panel summary-panel">
+            <div class="panel-header">
+                <h2>Training Labels</h2>
+                <span class="tag">Fare Ranges</span>
+            </div>
+            <div id="labelSummary" class="label-summary"></div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
