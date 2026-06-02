@@ -1,9 +1,11 @@
-"""Train and save the passenger crowd prediction model."""
+"""Train and save the railway crowd forecasting model."""
 
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import joblib
+import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
@@ -14,28 +16,160 @@ from sklearn.preprocessing import OneHotEncoder
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = BASE_DIR / "text_dataset" / "passenger_detail.csv"
+SOURCE_DATA_PATH = BASE_DIR / "text_dataset" / "passenger_detail.csv"
+DATASET_PATH = BASE_DIR / "text_dataset" / "railway_demand.csv"
 MODEL_PATH = BASE_DIR / "random_forest_model.pkl"
 WEB_MODEL_DATA_PATH = BASE_DIR / "web" / "model_data.json"
 
 TARGET_COLUMN = "crowd_level"
-NUMERIC_FEATURES = ["age", "fare"]
-CATEGORICAL_FEATURES = [
-    "gender",
-    "booking_type",
-    "source",
-    "destination",
-    "ticket_status",
+NUMERIC_FEATURES = [
+    "train_capacity",
+    "booked_seats",
+    "available_seats",
+    "waiting_list_count",
 ]
-FEATURE_COLUMNS = ["age", "gender", "booking_type", "source", "destination", "fare", "ticket_status"]
+CATEGORICAL_FEATURES = [
+    "day_type",
+    "festival_flag",
+    "source_station",
+    "destination_station",
+]
+FEATURE_COLUMNS = NUMERIC_FEATURES + CATEGORICAL_FEATURES
 VALID_LABELS = ["low", "medium", "high"]
+OCCUPANCY_THRESHOLDS = {
+    "low": (0.0, 0.40),
+    "medium": (0.41, 0.75),
+    "high": (0.76, 1.0),
+}
+
+STATION_FALLBACK = [
+    "Chennai",
+    "Bangalore",
+    "Mumbai",
+    "Delhi",
+    "Hyderabad",
+    "Kolkata",
+    "Pune",
+    "Jaipur",
+    "Lucknow",
+    "Kochi",
+    "Madurai",
+    "Trichy",
+]
 
 
-def load_dataset() -> tuple[pd.DataFrame, pd.Series]:
-    if not DATA_PATH.exists():
-        raise FileNotFoundError(f"Dataset not found: {DATA_PATH}")
+def occupancy_to_label(rate: float) -> str:
+    if rate <= OCCUPANCY_THRESHOLDS["low"][1]:
+        return "low"
+    if rate <= OCCUPANCY_THRESHOLDS["medium"][1]:
+        return "medium"
+    return "high"
 
-    df = pd.read_csv(DATA_PATH)
+
+def normalize_route_frame(source_df: pd.DataFrame | None) -> pd.DataFrame:
+    if source_df is None or source_df.empty:
+        rng = np.random.default_rng(42)
+        size = 4000
+        sources = rng.choice(STATION_FALLBACK, size=size, replace=True)
+        destinations = rng.choice(STATION_FALLBACK, size=size, replace=True)
+        routes = pd.DataFrame({"source": sources, "destination": destinations})
+        routes = routes[routes["source"] != routes["destination"]].copy()
+        return routes.reset_index(drop=True)
+
+    if "source" not in source_df.columns or "destination" not in source_df.columns:
+        return normalize_route_frame(None)
+
+    routes = source_df[["source", "destination"]].dropna().copy()
+    routes = routes[routes["source"] != routes["destination"]].copy()
+    if routes.empty:
+        return normalize_route_frame(None)
+    return routes.reset_index(drop=True)
+
+
+def generate_travel_dates(rng: np.random.Generator, size: int) -> list[datetime]:
+    start = datetime(2024, 1, 1)
+    end = datetime(2025, 12, 31)
+    delta_days = (end - start).days
+    offsets = rng.integers(0, delta_days + 1, size=size)
+    return [start + timedelta(days=int(offset)) for offset in offsets]
+
+
+def create_demand_dataset() -> pd.DataFrame:
+    source_df = pd.read_csv(SOURCE_DATA_PATH) if SOURCE_DATA_PATH.exists() else None
+    routes = normalize_route_frame(source_df)
+
+    rng = np.random.default_rng(42)
+    size = len(routes)
+    travel_dates = generate_travel_dates(rng, size)
+    day_types = ["Weekend" if date.weekday() >= 5 else "Weekday" for date in travel_dates]
+
+    route_tuples = list(zip(routes["source"], routes["destination"]))
+    route_counts = pd.Series(route_tuples).value_counts()
+    max_count = float(route_counts.max()) if not route_counts.empty else 1.0
+    popularity = np.array([route_counts[route] / max_count for route in route_tuples])
+
+    capacities = []
+    for score in popularity:
+        if score >= 0.7:
+            capacities.append(1200)
+        elif score >= 0.5:
+            capacities.append(1000)
+        elif score >= 0.3:
+            capacities.append(800)
+        else:
+            capacities.append(600)
+
+    capacities = np.array(capacities)
+    occupancy_rates = 0.25 + 0.6 * popularity + rng.normal(0, 0.08, size=size)
+    occupancy_rates = np.clip(occupancy_rates, 0.15, 1.0)
+    booked_seats = np.round(capacities * occupancy_rates).astype(int)
+    available_seats = np.maximum(capacities - booked_seats, 0)
+
+    waiting_list = []
+    for rate in occupancy_rates:
+        if rate >= 0.85:
+            waiting_list.append(int(rng.integers(40, 220)))
+        elif rate >= 0.7:
+            waiting_list.append(int(rng.integers(10, 120)))
+        else:
+            waiting_list.append(int(rng.integers(0, 60)))
+
+    festival_flag = []
+    for day_type in day_types:
+        probability = 0.18 if day_type == "Weekend" else 0.08
+        festival_flag.append("Yes" if rng.random() < probability else "No")
+
+    route_ids = {route: idx + 1001 for idx, route in enumerate(route_counts.index)}
+    train_ids = [f"TR{route_ids[route]:04d}" for route in route_tuples]
+
+    crowd_levels = [occupancy_to_label(rate) for rate in occupancy_rates]
+
+    dataset = pd.DataFrame(
+        {
+            "train_id": train_ids,
+            "source_station": routes["source"].astype(str).str.strip(),
+            "destination_station": routes["destination"].astype(str).str.strip(),
+            "train_capacity": capacities,
+            "booked_seats": booked_seats,
+            "available_seats": available_seats,
+            "waiting_list_count": waiting_list,
+            "day_type": day_types,
+            "festival_flag": festival_flag,
+            "travel_date": [date.strftime("%Y-%m-%d") for date in travel_dates],
+            "crowd_level": crowd_levels,
+        }
+    )
+
+    DATASET_PATH.write_text(dataset.to_csv(index=False), encoding="utf-8")
+    return dataset
+
+
+def load_dataset() -> pd.DataFrame:
+    if DATASET_PATH.exists():
+        df = pd.read_csv(DATASET_PATH)
+    else:
+        df = create_demand_dataset()
+
     required = FEATURE_COLUMNS + [TARGET_COLUMN]
     missing = [column for column in required if column not in df.columns]
     if missing:
@@ -60,7 +194,7 @@ def load_dataset() -> tuple[pd.DataFrame, pd.Series]:
     for column in CATEGORICAL_FEATURES:
         df[column] = df[column].astype(str).str.strip()
 
-    return df[FEATURE_COLUMNS], df[TARGET_COLUMN]
+    return df
 
 
 def build_pipeline() -> Pipeline:
@@ -90,23 +224,13 @@ def build_pipeline() -> Pipeline:
 
 
 def get_options(X: pd.DataFrame) -> dict[str, list[str]]:
-    return {
+    options = {
         column: sorted(X[column].dropna().astype(str).str.strip().unique().tolist())
         for column in CATEGORICAL_FEATURES
     }
-
-
-def get_fare_ranges(X: pd.DataFrame, y: pd.Series) -> dict[str, dict[str, int]]:
-    summary = (
-        pd.DataFrame({"fare": X["fare"], TARGET_COLUMN: y})
-        .groupby(TARGET_COLUMN)["fare"]
-        .agg(["min", "max"])
-        .to_dict("index")
-    )
-    return {
-        label: {key: int(value) for key, value in ranges.items()}
-        for label, ranges in summary.items()
-    }
+    if "festival_flag" not in options:
+        options["festival_flag"] = ["No", "Yes"]
+    return options
 
 
 def export_web_model_data(bundle: dict) -> None:
@@ -125,7 +249,9 @@ def export_web_model_data(bundle: dict) -> None:
 
 
 def main() -> None:
-    X, y = load_dataset()
+    df = load_dataset()
+    X = df[FEATURE_COLUMNS]
+    y = df[TARGET_COLUMN]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X,
@@ -160,7 +286,11 @@ def main() -> None:
             "accuracy": round(float(accuracy), 4),
             "rows_used": int(len(X)),
             "target_counts": {label: int(count) for label, count in y.value_counts().items()},
-            "fare_ranges": get_fare_ranges(X, y),
+            "occupancy_thresholds": {
+                "low": {"min": 0, "max": 40},
+                "medium": {"min": 41, "max": 75},
+                "high": {"min": 76, "max": 100},
+            },
         },
     }
 

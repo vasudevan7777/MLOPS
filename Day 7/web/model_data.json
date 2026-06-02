@@ -1,22 +1,14 @@
 {
   "options": {
-    "gender": [
-      "Agender",
-      "Bigender",
-      "Female",
-      "Genderfluid",
-      "Genderqueer",
-      "Male",
-      "Non-binary",
-      "Polygender"
+    "day_type": [
+      "Weekday",
+      "Weekend"
     ],
-    "booking_type": [
-      "Counter",
-      "Direct",
-      "Online",
-      "Tatkal"
+    "festival_flag": [
+      "No",
+      "Yes"
     ],
-    "source": [
+    "source_station": [
       "Agartala",
       "Agra",
       "Ahmedabad",
@@ -124,7 +116,7 @@
       "Visakhapatnam",
       "Warangal"
     ],
-    "destination": [
+    "destination_station": [
       "Agartala",
       "Agra",
       "Ahmedabad",
@@ -231,12 +223,6 @@
       "Vijayawada",
       "Visakhapatnam",
       "Warangal"
-    ],
-    "ticket_status": [
-      "Cancelled",
-      "Confirmed",
-      "RAC",
-      "Waiting"
     ]
   },
   "labels": [
@@ -245,25 +231,25 @@
     "HIGH"
   ],
   "metrics": {
-    "accuracy": 0.9996,
-    "rows_used": 12058,
+    "accuracy": 0.9975,
+    "rows_used": 11946,
     "target_counts": {
-      "low": 4426,
-      "high": 3854,
-      "medium": 3778
+      "low": 10273,
+      "medium": 1423,
+      "high": 250
     },
-    "fare_ranges": {
-      "high": {
-        "min": 1720,
-        "max": 2500
-      },
+    "occupancy_thresholds": {
       "low": {
-        "min": 100,
-        "max": 971
+        "min": 0,
+        "max": 40
       },
       "medium": {
-        "min": 972,
-        "max": 1719
+        "min": 41,
+        "max": 75
+      },
+      "high": {
+        "min": 76,
+        "max": 100
       }
     }
   }
