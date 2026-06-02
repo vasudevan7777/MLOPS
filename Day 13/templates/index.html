@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Railway Passenger Demand & Crowd Forecasting</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="top-header">
+      <div>
+        <p class="eyebrow">Railway AI Dashboard</p>
+        <h1>Smart Railway Passenger Demand & Crowd Forecasting</h1>
+        <p class="subtitle">AI Powered Passenger Crowd Detection using YOLOv8</p>
+      </div>
+      <div class="model-status">
+        <span class="status-dot"></span>
+        Model Loaded Successfully
+      </div>
+    </header>
+
+    <section class="dashboard-grid">
+      <form class="panel upload-panel" id="predictionForm">
+        <div class="panel-heading">
+          <p class="eyebrow">Input</p>
+          <h2>Upload Image or Video</h2>
+        </div>
+
+        <label class="drop-zone" id="dropZone" for="fileInput">
+          <input type="file" id="fileInput" name="file" accept=".jpg,.jpeg,.png,.mp4,.avi,.mov" hidden>
+          <span class="upload-icon">+</span>
+          <strong>Drop file here or browse</strong>
+          <small>jpg, jpeg, png, mp4, avi, mov</small>
+          <span class="filename" id="filename">No file selected</span>
+        </label>
+
+        <div class="progress-track" aria-hidden="true">
+          <span class="progress-bar" id="progressBar"></span>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="secondary-button" id="uploadButton">Upload</button>
+          <button type="submit" class="primary-button" id="predictButton">Predict</button>
+          <button type="button" class="ghost-button" id="clearButton">Clear</button>
+        </div>
+      </form>
+
+      <section class="panel result-panel">
+        <div class="panel-heading">
+          <p class="eyebrow">Output</p>
+          <h2>Prediction Result</h2>
+        </div>
+
+        <div class="preview" id="preview">
+          <div class="empty-state">
+            <span>Awaiting prediction</span>
+          </div>
+        </div>
+
+        <div class="result-cards">
+          <article class="metric-card">
+            <span>Passenger Count</span>
+            <strong id="passengerCount">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>Crowd Level</span>
+            <strong id="crowdLevel" class="crowd-pill">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>Confidence</span>
+            <strong id="confidence">--</strong>
+          </article>
+          <article class="metric-card">
+            <span>Processing Time</span>
+            <strong id="processingTime">--</strong>
+          </article>
+        </div>
+      </section>
+    </section>
+
+    <footer>Powered by Flask + YOLOv8</footer>
+  </main>
+
+  <div class="loader" id="loader" aria-hidden="true">
+    <div class="spinner"></div>
+    <span>Running prediction</span>
+  </div>
+
+  <div class="toast" id="toast">Prediction Completed Successfully</div>
+
+  <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
